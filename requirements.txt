@@ -1,2 +1,5 @@
 ! pip install pyvis
 ! pip install networkx
+!pip install pandas 
+!pip install geopandas
+
