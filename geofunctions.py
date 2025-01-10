@@ -12,13 +12,16 @@ import pickle
 import time
 import sys
 import traceback
+import vertexai
+
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 # use your KEY.
-OpenAI_key = config.get('API_Key', 'OpenAI_key')
-client = OpenAI(api_key=OpenAI_key)
+PROJECT_ID = config.get('API_Key', 'PROJECT_ID')
+LOCATION = config.get('Location', 'LOCATION_ID')
+vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 class Solution():
   
