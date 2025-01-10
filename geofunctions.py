@@ -6,14 +6,14 @@ import networkx as nx
 import pandas as pd
 import geopandas as gpd
 # from pyvis.network import Network
-from openai import OpenAI
 import configparser
 import pickle
 import time
 import sys
 import traceback
+import re
 import vertexai
-
+from vercelai import GenerativeModel 
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -23,14 +23,65 @@ PROJECT_ID = config.get('API_Key', 'PROJECT_ID')
 LOCATION = config.get('Location', 'LOCATION_ID')
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 
+from vercelai import GenerativeModel  # Ensure the library is installed and imported
+
+
+def extract_content_from_LLM_reply(response):
+    stream = False
+    if isinstance(response, list):
+        stream = True
+        
+    content = ""
+    if stream:       
+        for chunk in response:
+            chunk_content = chunk.choices[0].delta.content         
+
+            if chunk_content is not None:
+                # print(chunk_content, end='')
+                content += chunk_content
+                # print(content)
+        # print()
+    else:
+        content = response.choices[0].message.content
+        # print(content)
+        
+    return content
+
+def extract_code(response, verbose=False):
+    '''
+    Extract python code from reply
+    '''
+    # if isinstance(response, list):  # use OpenAI stream mode.
+    #     reply_content = ""
+    #     for chunk in response:
+    #         chunk_content = chunk["choices"][0].get("delta", {}).get("content")
+    #
+    #         if chunk_content is not None:
+    #             print(chunk_content, end='')
+    #             reply_content += chunk_content
+    #             # print(content)
+    # else:  # Not stream:
+    #     reply_content = response["choices"][0]['message']["content"]
+
+    python_code = ""
+    reply_content = extract_content_from_LLM_reply(response)
+    python_code_match = re.search(r"```(?:python)?(.*?)```", reply_content, re.DOTALL)
+    if python_code_match:
+        python_code = python_code_match.group(1).strip()
+
+    if verbose:
+        print(python_code)
+    
+    return python_code
+
+
 class Solution():
-  
     def __init__(self, 
                  task, 
                  task_name,
                  save_dir,                
                  role=constants.graph_role,
-                 model=r"gpt-4o",
+                 model_name="gemini-1.5-flash",  # Default to Gemini model
                  data_locations=[],
                  stream=True,
                  verbose=True,
@@ -39,7 +90,7 @@ class Solution():
         self.solution_graph = None
         self.graph_response = None
         self.role = role
-        self.data_locations=data_locations
+        self.data_locations = data_locations
         self.task_name = task_name   
         self.save_dir = save_dir
         self.code_for_graph = ""
@@ -52,7 +103,7 @@ class Solution():
         self.assembly_prompt = ""
         
         self.parent_solution = None
-        self.model = model
+        self.model_name = model_name  # Updated to use Gemini model name
         self.stream = stream
         self.verbose = verbose
 
@@ -73,12 +124,18 @@ class Solution():
                f'Data locations (each data is a node): {self.data_locations_str} \n'
         self.graph_prompt = graph_prompt
 
-        # self.direct_request_prompt = ''
         self.direct_request_LLM_response = ''
         self.direct_request_code = ''
 
         self.chat_history = [{'role': 'system', 'content': role}]
 
+        # Initialize Gemini Model
+        self.model = GenerativeModel(
+            model_name=self.model_name,
+            system_instruction=[role]
+        )
+        self.chat = self.model.start_chat()
+
     def get_LLM_reply(self,
             prompt,
             verbose=True,
@@ -89,122 +146,40 @@ class Solution():
             system_role=None,
             model=None,
             ):
-
-
         if system_role is None:
             system_role = self.role
 
         if model is None:
             model = self.model
 
-        # Query ChatGPT with the prompt
-        # if verbose:
-        #     print("Geting LLM reply... \n")
         count = 0
         isSucceed = False
-        self.chat_history.append({'role': 'user', 'content': prompt})
+        response = None
+
         while (not isSucceed) and (count < retry_cnt):
             try:
                 count += 1
-                response = client.chat.completions.create(model=model,
-                # messages=self.chat_history,  # Too many tokens to run.
-                messages=[
-                            {"role": "system", "content": system_role},
-                            {"role": "user", "content": prompt},
-                          ],
-                temperature=temperature,
-                stream=stream)
+                if verbose:
+                    print("Sending prompt to Gemini model...")
+                # Send prompt to Gemini model
+                response = self.chat.send_message(prompt)
+                isSucceed = True
             except Exception as e:
-                # logging.error(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
-                print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n",
-                      e)
+                print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
                 time.sleep(sleep_sec)
 
-        response_chucks = []
-        if stream:
-            for chunk in response:
-                response_chucks.append(chunk)
-                content = chunk.choices[0].delta.content
-                if content is not None:
-                    if verbose:
-                        print(content, end='')
-        else:
-            content = response.choices[0].message.content
-            # print(content)
-        print('\n\n')
-        # print("Got LLM reply.")
+        if not isSucceed:
+            raise RuntimeError("Failed to get response from Gemini model after multiple retries.")
 
-        response = response_chucks  # good for saving
+        # Extract response content
+        content = response["message"] if isinstance(response, dict) else str(response)
 
-        content = helper.extract_content_from_LLM_reply(response)
+        if verbose:
+            print("LLM Response:\n", content)
 
         self.chat_history.append({'role': 'assistant', 'content': content})
-
-        return response
-    
-    def get_LLM_reply(self,
-            prompt,
-            verbose=True,
-            temperature=1,
-            stream=True,
-            retry_cnt=3,
-            sleep_sec=10,
-            system_role=None,
-            model=None,
-            ):
-
-
-        if system_role is None:
-            system_role = self.role
-
-        if model is None:
-            model = self.model
-
-        # Query ChatGPT with the prompt
-        # if verbose:
-        #     print("Geting LLM reply... \n")
-        count = 0
-        isSucceed = False
-        self.chat_history.append({'role': 'user', 'content': prompt})
-        while (not isSucceed) and (count < retry_cnt):
-            try:
-                count += 1
-                response = client.chat.completions.create(model=model,
-                # messages=self.chat_history,  # Too many tokens to run.
-                messages=[
-                            {"role": "system", "content": system_role},
-                            {"role": "user", "content": prompt},
-                          ],
-                temperature=temperature,
-                stream=stream)
-            except Exception as e:
-                # logging.error(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n", e)
-                print(f"Error in get_LLM_reply(), will sleep {sleep_sec} seconds, then retry {count}/{retry_cnt}: \n",
-                      e)
-                time.sleep(sleep_sec)
-
-        response_chucks = []
-        if stream:
-            for chunk in response:
-                response_chucks.append(chunk)
-                content = chunk.choices[0].delta.content
-                if content is not None:
-                    if verbose:
-                        print(content, end='')
-        else:
-            content = response.choices[0].message.content
-            # print(content)
-        print('\n\n')
-        # print("Got LLM reply.")
-
-        response = response_chucks  # good for saving
-
-        content = helper.extract_content_from_LLM_reply(response)
-
-        self.chat_history.append({'role': 'assistant', 'content': content})
-
-        return response
-
+        return content
+      
 
     def get_LLM_response_for_graph(self, execuate=True):
         # self.chat_history.append()
@@ -245,6 +220,7 @@ class Solution():
         return self.solution_graph 
 
     @property
+    
     def operation_node_names(self):
         opera_node_names = []
         assert self.solution_graph, "The Soluction class instance has no solution graph. Please generate the graph"
@@ -292,7 +268,7 @@ class Solution():
         defs = '\n'.join(operation_def_list)
         return defs
 
-    def get_prompt_for_an_opearation(self, operation):
+    def get_prompt_for_an_operation(self, operation):
         assert self.solution_graph, "Do not find solution graph!"
         # operation_dict = function_def.copy()
 
