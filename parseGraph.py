@@ -16,7 +16,9 @@ from geofunctions import Solution
 
 
 #this is a global variable that should be used when the call to Solution class is made
-isReview = True
+
+# isReview = True
+
 '''the output of the LLM is stored in 'response': which has the code for the graph operations for which the next step is
    to generate python code for each node and travaerse the map '''
 
