@@ -1,0 +1,93 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d2" for="node" attr.name="description" attr.type="string" />
+  <key id="d1" for="node" attr.name="data_path" attr.type="string" />
+  <key id="d0" for="node" attr.name="node_type" attr.type="string" />
+  <graph edgedefault="directed">
+    <node id="NC_tract_boundary_shp_url">
+      <data key="d0">data</data>
+      <data key="d1">https://github.com/gladcolor/LLM-Geo/raw/master/overlay_analysis/tract_37_EPSG4326.zip</data>
+      <data key="d2">North Carolina tract boundary shapefile URL</data>
+    </node>
+    <node id="NC_hazwaste_shp_url">
+      <data key="d0">data</data>
+      <data key="d1">https://github.com/gladcolor/LLM-Geo/raw/master/overlay_analysis/HW_Sites_EPSG4326.zip</data>
+      <data key="d2">North Carolina hazardous waste sites shapefile URL</data>
+    </node>
+    <node id="NC_tract_pop_csv_url">
+      <data key="d0">data</data>
+      <data key="d1">https://github.com/gladcolor/LLM-Geo/raw/master/overlay_analysis/NC_tract_population.csv</data>
+      <data key="d2">North Carolina tract population CSV file URL</data>
+    </node>
+    <node id="NC_tracts_gdf">
+      <data key="d0">data</data>
+      <data key="d1" />
+      <data key="d2">GeoDataFrame of North Carolina tracts</data>
+    </node>
+    <node id="NC_hazwaste_gdf">
+      <data key="d0">data</data>
+      <data key="d1" />
+      <data key="d2">GeoDataFrame of North Carolina hazardous waste sites</data>
+    </node>
+    <node id="NC_tract_pop_df">
+      <data key="d0">data</data>
+      <data key="d1" />
+      <data key="d2">DataFrame of North Carolina tract population</data>
+    </node>
+    <node id="tracts_with_hazwaste">
+      <data key="d0">data</data>
+      <data key="d1" />
+      <data key="d2">GeoDataFrame of tracts containing hazardous waste</data>
+    </node>
+    <node id="population_in_hazwaste_tracts">
+      <data key="d0">data</data>
+      <data key="d1" />
+      <data key="d2">Population in tracts with hazardous waste</data>
+    </node>
+    <node id="pop_choropleth_map">
+      <data key="d0">data</data>
+      <data key="d1" />
+      <data key="d2">Population choropleth map</data>
+    </node>
+    <node id="load_tract_shp">
+      <data key="d0">operation</data>
+      <data key="d2">Load North Carolina tract shapefile</data>
+    </node>
+    <node id="load_hazwaste_shp">
+      <data key="d0">operation</data>
+      <data key="d2">Load North Carolina hazardous waste shapefile</data>
+    </node>
+    <node id="load_tract_pop_csv">
+      <data key="d0">operation</data>
+      <data key="d2">Load North Carolina tract population CSV</data>
+    </node>
+    <node id="spatial_join">
+      <data key="d0">operation</data>
+      <data key="d2">Perform spatial join between tracts and hazardous waste sites</data>
+    </node>
+    <node id="calculate_total_pop">
+      <data key="d0">operation</data>
+      <data key="d2">Calculate total population in tracts with hazardous waste</data>
+    </node>
+    <node id="create_choropleth_map">
+      <data key="d0">operation</data>
+      <data key="d2">Create population choropleth map, highlighting tracts with hazardous waste</data>
+    </node>
+    <edge source="NC_tract_boundary_shp_url" target="load_tract_shp" />
+    <edge source="NC_hazwaste_shp_url" target="load_hazwaste_shp" />
+    <edge source="NC_tract_pop_csv_url" target="load_tract_pop_csv" />
+    <edge source="NC_tracts_gdf" target="spatial_join" />
+    <edge source="NC_tracts_gdf" target="create_choropleth_map" />
+    <edge source="NC_hazwaste_gdf" target="spatial_join" />
+    <edge source="NC_tract_pop_df" target="calculate_total_pop" />
+    <edge source="NC_tract_pop_df" target="create_choropleth_map" />
+    <edge source="tracts_with_hazwaste" target="calculate_total_pop" />
+    <edge source="tracts_with_hazwaste" target="create_choropleth_map" />
+    <edge source="load_tract_shp" target="NC_tracts_gdf" />
+    <edge source="load_hazwaste_shp" target="NC_hazwaste_gdf" />
+    <edge source="load_tract_pop_csv" target="NC_tract_pop_df" />
+    <edge source="spatial_join" target="tracts_with_hazwaste" />
+    <edge source="calculate_total_pop" target="population_in_hazwaste_tracts" />
+    <edge source="create_choropleth_map" target="pop_choropleth_map" />
+  </graph>
+</graphml>
